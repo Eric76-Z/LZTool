@@ -18,6 +18,7 @@ class MySignals(QObject):
     # 此处也可分开写两个函数，一个是文本框输出的，一个是给进度条赋值的
     text_print = Signal(QLabel, str, int)
 
+
 class MyLabel(QLabel):
     x0 = 0
     y0 = 0
@@ -49,8 +50,10 @@ class MyLabel(QLabel):
         painter = QPainter(self)
         painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
         painter.drawRect(rect)
-
-
+        drawing.x0 = self.x0
+        drawing.y0 = self.y0
+        drawing.width = rect.width()
+        drawing.height = rect.height()
 
 
 def window_capture():
@@ -131,9 +134,9 @@ class Drawing(QWidget):
     defultsize = 600
     x0 = 0
     y0 = 0
-    x1 = 0
-    y1 = 0
-    flag = False
+    width = 0
+    height = 0
+
     def __init__(self, parent=None):
         super(Drawing, self).__init__(parent)
         self.resize(600, 400)
@@ -152,7 +155,6 @@ class Drawing(QWidget):
         grid.addWidget(self.label_pic)
         self.setLayout(grid)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)  # 无边框
-
 
     def process(self):
         self.createSelectTh()
@@ -211,6 +213,7 @@ class Drawing(QWidget):
         self.close()
 
     def confirmArea(self):
+
         print(drawing.label_pic.x0)
         print(drawing.label_pic.x1)
         print('wwwwww')

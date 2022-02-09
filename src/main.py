@@ -9,8 +9,6 @@ from PySide2.QtGui import QMouseEvent, QPen, QPainter
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import QApplication, QLabel, QWidget, QMenu, QAction, QGridLayout
 
-from src.common.setting import main_ui_path
-
 
 class MySignals(QObject):
     # 定义一种信号，因为有文本框和进度条两个类，此处要四个参数，类型分别是： QPlainTextEdit 、 QProgressBar、字符串和整形数字
@@ -46,24 +44,31 @@ class MyLabel(QLabel):
     # 绘制事件
     def paintEvent(self, event):
         super().paintEvent(event)
-        rect = QRect(self.x0, self.y0, abs(self.x1 - self.x0), abs(self.y1 - self.y0))
+        rect = QRect(self.x0, self.y0, (self.x1 - self.x0), (self.y1 - self.y0))
         painter = QPainter(self)
         painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
         painter.drawRect(rect)
-        drawing.x0 = self.x0
-        drawing.y0 = self.y0
-        drawing.width = rect.width()
-        drawing.height = rect.height()
+        if self.x0 <= self.x1:
+            drawing.x0 = self.x0
+            drawing.y0 = self.y0
+        else:
+            drawing.x0 = self.x1
+            drawing.y0 = self.y1
+        drawing.width = abs(rect.width())
+        drawing.height = abs(rect.height())
 
 
-def window_capture():
+def get_hWnd():
     winType = mainwindow.ui.lineEdit_type.text()
     winTitle = mainwindow.ui.lineEdit_title.text()
     winType = 'Q360SafeMainClass'
     winTitle = '360安全卫士'
-
     # 获取后台窗口的句柄，注意后台窗口不能最小化
     hWnd = win32gui.FindWindow(winType, winTitle)  # 窗口的类名可以用Visual Studio的SPY++工具获取
+    return hWnd
+
+
+def window_capture(x, y, w, h, hWnd, isall):
     # 获取句柄窗口的大小信息
     try:
         left, top, right, bot = win32gui.GetWindowRect(hWnd)
@@ -71,30 +76,37 @@ def window_capture():
         height = bot - top
         # 返回句柄窗口的设备环境，覆盖整个窗口，包括非客户区，标题栏，菜单，边框
         hWndDC = win32gui.GetWindowDC(hWnd)
+        print(hWndDC)
         # 创建设备描述表
         mfcDC = win32ui.CreateDCFromHandle(hWndDC)
+
         # 创建内存设备描述表
         saveDC = mfcDC.CreateCompatibleDC()
         # 创建位图对象准备保存图片
         saveBitMap = win32ui.CreateBitmap()
         # 为bitmap开辟存储空间
-        saveBitMap.CreateCompatibleBitmap(mfcDC, 200, 50)
+        if isall == False:
+            saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
+        else:
+            saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
         # 将截图保存到saveBitMap中
         saveDC.SelectObject(saveBitMap)
         # 保存bitmap到内存设备描述表
-        saveDC.BitBlt((0, 0), (width, height), mfcDC, (20, 30), win32con.SRCCOPY)
-        # 保存图像
-        # 方法一：windows api保存
-        ##保存bitmap到文件
+        if isall == False:
+            saveDC.BitBlt((0, 0), (width, height), mfcDC, (x, y), win32con.SRCCOPY)
+        else:
+            saveDC.BitBlt((0, 0), (width, height), mfcDC, (0, 0), win32con.SRCCOPY)
+
+        # ------保存图像------
+        # 保存bitmap到文件
         saveBitMap.SaveBitmapFile(saveDC, "img/toplay.png")
-        # ##方法二(第一部分)：PIL保存
-        # ###获取位图信息
-        # bmpinfo = saveBitMap.GetInfo()
-        # bmpstr = saveBitMap.GetBitmapBits(True)
-        # ###生成图像
-        # im_PIL = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
-        # im_PIL.save("img/toplay.png")  # 保存
         startwindow.rightWin = True
+
+        # 释放内存
+        win32gui.DeleteObject(saveBitMap.GetHandle())
+        saveDC.DeleteDC()
+        mfcDC.DeleteDC()
+        win32gui.ReleaseDC(hWnd, hWndDC)
     except:
         startwindow.rightWin = False
 
@@ -104,7 +116,7 @@ class Ui_Mainwindows():
         # 从文件中加载UI定义
         # 从 UI 定义中动态 创建一个相应的窗口对象
         # 注意：里面的控件对象也成为窗口对象的属性了
-        self.ui = QUiLoader().load(main_ui_path)
+        self.ui = QUiLoader().load('ui/lztMain.ui')
         self.process()
 
     def process(self):
@@ -146,7 +158,7 @@ class Drawing(QWidget):
         self.label_pic = MyLabel(self)  # 重定义的label
 
         self.label_pic.setAutoFillBackground(True)
-        self.label_pic.resize(self.width(), self.height())
+        self.label_pic.resize(self.width, self.height)
         self.label_pic.setScaledContents(True)  # 让图片自适应label大小
         self.label_pic.setCursor(Qt.CrossCursor)
         self.label_pic.setGeometry(QRect(30, 30, 511, 541))
@@ -166,7 +178,8 @@ class Drawing(QWidget):
         self.th.start()
 
     def selectTarget(self):
-        window_capture()
+        hWnd = get_hWnd()
+        window_capture(self.x0, self.y0, self.width, self.height, hWnd, isall=True)
         if startwindow.rightWin == True:
             pixmap = QtGui.QPixmap('img/toplay.png')
         else:
@@ -210,26 +223,18 @@ class Drawing(QWidget):
         self.showMinimized()
 
     def clickExit(self):
+
         self.close()
 
     def confirmArea(self):
-
-        print(drawing.label_pic.x0)
-        print(drawing.label_pic.x1)
+        print(self.x0)
+        print(self.x0)
+        print(self.width)
+        print(self.height)
         print('wwwwww')
 
 
 class Ui_StartWindows(QWidget):
-    # def __init__(self):
-    #     super().__init__()
-    #     self.ui = QUiLoader().load(start_ui_path)
-    #     self._startPos = None
-    #     self._endPos = None
-    #     self._tracking = False
-    #     # 窗体置顶(窗体置顶，仅仅为了方便测试)，去边框
-    #     self.ui.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
-    #     # 窗体透明，控件不透明
-    #     # self.setAttribute(Qt.WA_TranslucentBackground)
     _startPos = None
     _endPos = None
     _isTracking = False
@@ -259,8 +264,10 @@ class Ui_StartWindows(QWidget):
         self.th.start()
 
     def loopGrab(self):
+        hWnd = get_hWnd()
         while self.Flag == True:
-            window_capture()
+            print(self.Flag)
+            window_capture(drawing.x0, drawing.y0, drawing.width, drawing.height, hWnd, isall=False)
             self.playImg()
             sleep(0.05)
 
@@ -319,6 +326,7 @@ class Ui_StartWindows(QWidget):
         self.showMinimized()
 
     def clickExit(self):
+        self.Flag = False
         self.close()
 
 

@@ -48,14 +48,6 @@ class MyLabel(QLabel):
         painter = QPainter(self)
         painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
         painter.drawRect(rect)
-        if self.x0 <= self.x1:
-            drawing.x0 = self.x0
-            drawing.y0 = self.y0
-        else:
-            drawing.x0 = self.x1
-            drawing.y0 = self.y1
-        drawing.width = abs(rect.width())
-        drawing.height = abs(rect.height())
 
 
 def get_hWnd():
@@ -68,15 +60,13 @@ def get_hWnd():
     return hWnd
 
 
-def window_capture(x, y, w, h, hWnd, isall):
+def window_capture(hWnd, isall):
     # 获取句柄窗口的大小信息
     try:
         left, top, right, bot = win32gui.GetWindowRect(hWnd)
         width = right - left
-        height = bot - top
-        # 返回句柄窗口的设备环境，覆盖整个窗口，包括非客户区，标题栏，菜单，边框
+        height = bot - top        # 返回句柄窗口的设备环境，覆盖整个窗口，包括非客户区，标题栏，菜单，边框
         hWndDC = win32gui.GetWindowDC(hWnd)
-        print(hWndDC)
         # 创建设备描述表
         mfcDC = win32ui.CreateDCFromHandle(hWndDC)
 
@@ -86,14 +76,15 @@ def window_capture(x, y, w, h, hWnd, isall):
         saveBitMap = win32ui.CreateBitmap()
         # 为bitmap开辟存储空间
         if isall == False:
-            saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
+            saveBitMap.CreateCompatibleBitmap(mfcDC, drawing.width, drawing.height)
         else:
             saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
         # 将截图保存到saveBitMap中
         saveDC.SelectObject(saveBitMap)
         # 保存bitmap到内存设备描述表
+        print(drawing.width)
         if isall == False:
-            saveDC.BitBlt((0, 0), (width, height), mfcDC, (x, y), win32con.SRCCOPY)
+            saveDC.BitBlt((0, 0), (width, height), mfcDC, (drawing.x0, drawing.y0), win32con.SRCCOPY)
         else:
             saveDC.BitBlt((0, 0), (width, height), mfcDC, (0, 0), win32con.SRCCOPY)
 
@@ -179,7 +170,7 @@ class Drawing(QWidget):
 
     def selectTarget(self):
         hWnd = get_hWnd()
-        window_capture(self.x0, self.y0, self.width, self.height, hWnd, isall=True)
+        window_capture(hWnd, isall=True)
         if startwindow.rightWin == True:
             pixmap = QtGui.QPixmap('img/toplay.png')
         else:
@@ -227,11 +218,18 @@ class Drawing(QWidget):
         self.close()
 
     def confirmArea(self):
-        print(self.x0)
-        print(self.x0)
-        print(self.width)
-        print(self.height)
-        print('wwwwww')
+        print(self.label_pic.y1)
+        print(self.label_pic.y0)
+        rect = QRect(self.label_pic.x0, self.label_pic.y0, (self.label_pic.x1 - self.label_pic.x0),
+                     (self.label_pic.y1 - self.label_pic.y0))
+        if self.label_pic.x0 <= self.label_pic.x1:
+            self.x0 = self.label_pic.x0
+            self.y0 = self.label_pic.y0
+        else:
+            self.x0 = self.label_pic.x1
+            self.y0 = self.label_pic.y1
+        self.width = abs(rect.width())
+        self.height = abs(rect.height())
 
 
 class Ui_StartWindows(QWidget):
@@ -266,8 +264,7 @@ class Ui_StartWindows(QWidget):
     def loopGrab(self):
         hWnd = get_hWnd()
         while self.Flag == True:
-            print(self.Flag)
-            window_capture(drawing.x0, drawing.y0, drawing.width, drawing.height, hWnd, isall=False)
+            window_capture(hWnd, isall=False)
             self.playImg()
             sleep(0.05)
 
